@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Thumbnail Generator</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+
+    label, input, select, textarea {
+      display: block;
+      margin-bottom: 10px;
+      width: 100%;
+    }
+
+    button {
+      padding: 10px 20px;
+      background-color: #0069ed;
+      color: white;
+      border: none;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background-color: #0053ba;
+    }
+
+    #result {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Thumbnail Generator</h1>
+
+  <form id="upload-form">
+    <label for="text">Thumbnail Text:</label>
+    <input type="text" id="text" name="text" required />
+
+    <label for="filetype">File Type (jpeg or png):</label>
+    <select id="filetype" name="filetype">
+      <option value="jpeg">JPEG</option>
+      <option value="png">PNG</option>
+    </select>
+
+    <label for="image">Select Image:</label>
+    <input type="file" id="image" name="image" accept=".jpg,.jpeg,.png" required />
+
+    <button type="submit">Generate Thumbnail</button>
+  </form>
+
+  <div id="result"></div>
+
+  <script>
+    document.getElementById('upload-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const text = document.getElementById('text').value;
+      const filetype = document.getElementById('filetype').value;
+      const fileInput = document.getElementById('image');
+      const file = fileInput.files[0];
+
+      if (!file) {
+        alert("Please choose a file.");
+        return;
+      }
+
+      // Step 1: Request a presigned URL
+      const presignedRes = await fetch("https://lobz240pgh.execute-api.us-east-1.amazonaws.com/generate-presigned-url", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          text: text,
+          filetype: filetype
+        })
+      });
+
+      const { url, filename } = await presignedRes.json();
+
+      // Step 2: Upload file to S3 using presigned URL
+      const uploadRes = await fetch(url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": file.type
+        },
+        body: file
+      });
+
+      if (uploadRes.ok) {
+        document.getElementById("result").innerHTML = `
+          ✅ Uploaded successfully!<br>
+          <strong>Processed thumbnail will appear shortly:</strong><br>
+          <code>${filename}</code>
+        `;
+
+        setTimeout(() => {
+            checkForThumbnail(filename);
+        }, 3000);
+      } else {
+        document.getElementById("result").innerHTML = "❌ Upload failed.";
+      }
+    });
+    async function checkForThumbnail(filename, retries = 5) {
+    const pollRes = await fetch(`https://6higrcv5yb.execute-api.us-east-1.amazonaws.com/check-thumbnail?filename=${filename}`);
+    
+    if (pollRes.ok) {
+      const { downloadUrl } = await pollRes.json();
+      document.getElementById("result").innerHTML += `
+        <br><strong>✅ Thumbnail Ready!</strong><br>
+        <a href="${downloadUrl}" target="_blank" download>Click here to download</a>
+      `;
+    } else if (retries > 0) {
+      setTimeout(() => {
+        checkForThumbnail(filename, retries - 1);
+      }, 3000); // Retry after 3 seconds
+    } else {
+      document.getElementById("result").innerHTML += `<br>⏳ Thumbnail still processing. Try again shortly.`;
+    }
+  }
+  </script>
+
+</body>
+</html>
