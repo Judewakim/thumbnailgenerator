@@ -21,12 +21,21 @@ def lambda_handler(event, context):
         # Download image
         original_image = s3.get_object(Bucket=bucket, Key=key)['Body'].read()
         try:
-            image = Image.open(io.BytesIO(original_image)).convert("RGB")
-        
+            image = Image.open(io.BytesIO(original_image))
+            image = image.convert("RGB")
         except UnidentifiedImageError:
+            print(f"Error: Uploaded file '{key}' is not a valid image.")
             return {
                 'statusCode': 400,
-                'body': 'The uploaded file is not a valid image.'
+                'body': 'Error: The uploaded file is not a valid or supported image format. Please upload JPG or PNG.'
+            }
+
+        # Only allow JPG and PNG types — mobile users can upload HEIC otherwise
+        if image.format not in ["JPEG", "PNG"]:
+            print(f"Unsupported image format: {image.format}")
+            return {
+                'statusCode': 400,
+                'body': 'Error: Only JPG or PNG images are supported. Please reupload in the correct format.'
             }
     
         # Resize to 1280x720
@@ -36,9 +45,6 @@ def lambda_handler(event, context):
         canvas = Image.new('RGB', (1280, 720), (0, 0, 0)) 
         # Paste the resized image on the center of the black canvas
         canvas.paste(image, ((1280 - image.width) // 2, (720 - image.height) // 2))
-
-        # ImageDraw.Draw lets you draw shapes, lines, or text onto a Pillow image
-        draw = ImageDraw.Draw(canvas)
 
         # Apply translucent black overlay for contrast 
         # (later will improve this logic to make it dynamic)
