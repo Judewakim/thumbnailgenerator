@@ -111,8 +111,4 @@ MIT License. Go wild.
 
 Built with caffeine, memes, and a desire to never manually resize a YouTube thumbnail again.
 
-```
 
----
-
-Let me know if you want a styled badge section, deployment instructions using SAM or Terraform, or to embed your Medium article when it's done!
